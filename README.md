@@ -3,6 +3,8 @@
 # 🐱 NEKO AI
 ### Asistente personal con IA — Hub tipo JARVIS
 
+![Deploy](https://github.com/Lean031110/neko-ai/actions/workflows/deploy.yml/badge.svg)
+![CI](https://github.com/Lean031110/neko-ai/actions/workflows/ci.yml/badge.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
 ![Tailwind](https://img.shields.io/badge/Tailwind-4-38bdf8?logo=tailwindcss)
@@ -10,12 +12,12 @@
 ![Ollama](https://img.shields.io/badge/Ollama-local-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-![CI](https://github.com/Lean031110/neko-ai/actions/workflows/ci.yml/badge.svg)
+### 🌐 [Probar la demo en GitHub Pages](https://lean031110.github.io/neko-ai/)
 
 </div>
 
 <p align="center">
-  <em>Una interfaz conversacional always-listening con espectro de voz, widgets funcionales y personalidad propia. Soporta Groq (cloud) y Ollama (IA 100% local).</em>
+  <em>Una interfaz conversacional always-listening con espectro de voz, widgets funcionales, memoria persistente y personalidad propia. Soporta Groq (cloud) y Ollama (IA 100% local).</em>
 </p>
 
 ---
@@ -51,18 +53,40 @@ La aplicación puede funcionar con **dos backends de IA intercambiables desde la
 - 🔑 **API key de Groq configurable** sin tocar código (guardada en localStorage)
 - 🎚️ **Ajustes de voz**: velocidad, tono, idioma
 
+### Fase 3 — Memoria persistente ✅
+- 🧠 **Extracción automática de hechos**: tras cada mensaje, un LLM extrae hechos dignos de recordar
+- 💾 **IndexedDB**: memoria e historial guardados en el navegador (privacidad total, sin servidor)
+- 🔍 **RAG básico**: inyecta recuerdos relevantes en el contexto antes de responder
+- 🗂️ **Panel de memoria**: busca, edita y borra recuerdos individuales
+- 📊 **Estadísticas**: contador de recuerdos, mensajes y antigüedad
+- 🌐 **Deploy en GitHub Pages**: app 100% estática, sin backend
+- 🔄 **Historial persistente**: la conversación se restaura al recargar
+
 ## 🗺️ Roadmap
 
 | Fase | Estado | Descripción |
 |------|--------|-------------|
 | **1** | ✅ Listo | Hub base + escucha + voz + Groq/Ollama + widgets |
 | **2** | ✅ Listo | Voiceprint + selector de proveedor IA |
-| **3** | ⏳ Pendiente | Memoria persistente y aprendizaje del usuario |
+| **3** | ✅ Listo | Memoria persistente con IndexedDB + extracción de hechos |
 | **4** | ⏳ Pendiente | Iniciativa de conversación (Neko te habla solo) |
 | **5** | ⏳ Pendiente | Scripts, información personal, widgets avanzados |
 | **6** | ⏳ Pendiente | STT local con Whisper, TTS con Piper |
 
 📄 Detalle completo en [`docs/PHASES.md`](docs/PHASES.md).
+
+## 🚀 Demo en vivo
+
+La app está desplegada en **GitHub Pages**:
+
+👉 **https://lean031110.github.io/neko-ai/**
+
+Para usarla necesitas:
+1. Abrir la URL en Chrome o Edge (Firefox no soporta reconocimiento de voz)
+2. Pulsar el icono ⚙️ → pestaña "IA" → introducir tu API key de Groq (gratis en [console.groq.com/keys](https://console.groq.com/keys))
+3. Activar el micrófono y empezar a hablar con Neko
+
+> La API key se guarda solo en tu navegador (localStorage). Nunca se envía a ningún servidor intermedio.
 
 ## 🛠️ Stack Tecnológico
 
