@@ -12,10 +12,16 @@ import { WeatherWidget } from '@/components/hub/WeatherWidget';
 import { SystemWidget } from '@/components/hub/SystemWidget';
 import { QuickActionsWidget } from '@/components/hub/QuickActionsWidget';
 import { SettingsDialog } from '@/components/hub/SettingsDialog';
+import { MemoryPanel } from '@/components/hub/MemoryPanel';
 import { VoiceprintTrainer } from '@/components/voice/VoiceprintTrainer';
 import { useVoiceprint } from '@/components/voice/useVoiceprint';
 import { NEKO_GREETING } from '@/lib/neko-prompt';
 import { chat, resolveProvider } from '@/lib/llm-service';
+import {
+  extractAndStoreMemories,
+  buildMemoryContext,
+} from '@/lib/memory-service';
+import { addMessage, getRecentMessages, clearMessages as clearDbMessages } from '@/lib/memory-db';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +37,7 @@ import {
   Fingerprint,
   Cloud,
   HardDrive,
+  Brain,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -58,6 +65,9 @@ export function NekoHub() {
   const greetedRef = useRef(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [voiceprintOpen, setVoiceprintOpen] = useState(false);
+  const [memoryOpen, setMemoryOpen] = useState(false);
+  const [memoriesCount, setMemoriesCount] = useState(0);
+  const [memorizing, setMemorizing] = useState(false);
   const [activeProvider, setActiveProvider] = useState<'groq' | 'ollama'>(
     'groq',
   );
@@ -65,6 +75,37 @@ export function NekoHub() {
     status: 'idle' | 'checking' | 'ok' | 'rejected';
     similarity?: number;
   }>({ status: 'idle' });
+
+  // Cargar historial persistente al montar (IndexedDB)
+  useEffect(() => {
+    void (async () => {
+      try {
+        const recent = await getRecentMessages(20);
+        if (recent.length > 0) {
+          // Cargar en el store Zustand
+          recent.forEach((m) => {
+            useNekoStore.getState().pushMessage(
+              m.role,
+              m.content,
+            );
+          });
+        }
+      } catch (e) {
+        console.warn('[neko] no se pudo cargar historial:', e);
+      }
+    })();
+  }, []);
+
+  // Refrescar contador de recuerdos cuando se abre el panel
+  useEffect(() => {
+    if (memoryOpen) {
+      void (async () => {
+        const { getStats } = await import('@/lib/memory-db');
+        const s = await getStats();
+        setMemoriesCount(s.memoriesCount);
+      })();
+    }
+  }, [memoryOpen]);
 
   // Aplicar configuración de voz del store de settings al TTS
   useEffect(() => {
@@ -129,6 +170,7 @@ export function NekoHub() {
           return;
         }
         pushMessage('user', text);
+        void addMessage({ role: 'user', content: text, timestamp: Date.now() });
         setInterim('');
         void sendToNeko(text);
       })();
@@ -156,7 +198,9 @@ export function NekoHub() {
       setState('thinking');
       setLoading(true);
       setError(null);
-      const history = [
+
+      // Inyectar memoria relevante (RAG básico)
+      let history: Array<{ role: 'user' | 'assistant' | 'system'; content: string }> = [
         ...messages
           .filter((m) => m.role !== 'system')
           .slice(-10)
@@ -164,10 +208,36 @@ export function NekoHub() {
         { role: 'user' as const, content: text },
       ];
       try {
+        const memoryCtx = await buildMemoryContext(text);
+        if (memoryCtx) {
+          history = [memoryCtx, ...history];
+        }
+      } catch (e) {
+        console.warn('[neko] memoria no disponible:', e);
+      }
+
+      try {
         const { reply, provider } = await chat(history);
         setActiveProvider(provider);
         pushMessage('assistant', reply);
+        void addMessage({ role: 'assistant', content: reply, timestamp: Date.now() });
         setLoading(false);
+
+        // Extracción de memoria en background (sin bloquear la voz)
+        void (async () => {
+          setMemorizing(true);
+          try {
+            await extractAndStoreMemories(text);
+            // Refrescar contador
+            const { getStats } = await import('@/lib/memory-db');
+            const s = await getStats();
+            setMemoriesCount(s.memoriesCount);
+          } catch (e) {
+            console.warn('[neko] extracción de memoria falló:', e);
+          } finally {
+            setMemorizing(false);
+          }
+        })();
 
         if (ttsEnabled && tts.supported) {
           setState('speaking');
@@ -228,11 +298,21 @@ export function NekoHub() {
       return;
     }
     pushMessage('user', text);
+    void addMessage({ role: 'user', content: text, timestamp: Date.now() });
     void sendToNeko(text);
   };
 
   const enableMic = () => {
     setMicEnabled(true);
+  };
+
+  const handleClearChat = async () => {
+    clearMessages();
+    try {
+      await clearDbMessages();
+    } catch (e) {
+      console.warn('[neko] no se pudo limpiar DB:', e);
+    }
   };
 
   const spectrumMode = state === 'speaking' ? 'output' : 'input';
@@ -314,6 +394,26 @@ export function NekoHub() {
             <Button
               size="icon"
               variant="outline"
+              className="h-9 w-9 bg-background/30 relative"
+              onClick={() => setMemoryOpen(true)}
+              title="Memoria de Neko"
+            >
+              <Brain
+                className={`w-4 h-4 ${
+                  memoriesCount > 0
+                    ? 'text-cyan-400'
+                    : 'text-muted-foreground'
+                }`}
+              />
+              {memoriesCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-cyan-500 text-[9px] font-bold text-background flex items-center justify-center">
+                  {memoriesCount > 99 ? '99+' : memoriesCount}
+                </span>
+              )}
+            </Button>
+            <Button
+              size="icon"
+              variant="outline"
               className="h-9 w-9 bg-background/30"
               onClick={() => setVoiceprintOpen(true)}
               title="Entrenar mi voz"
@@ -365,7 +465,7 @@ export function NekoHub() {
               size="sm"
               variant="ghost"
               className="text-xs text-muted-foreground hover:text-foreground"
-              onClick={clearMessages}
+              onClick={handleClearChat}
             >
               Limpiar
             </Button>
@@ -539,8 +639,8 @@ export function NekoHub() {
       {/* Footer sutil */}
       <footer className="border-t border-border/30 mt-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between text-[10px] text-muted-foreground">
-          <span className="flex items-center gap-2">
-            Neko AI · Fase 2
+          <span className="flex items-center gap-2 flex-wrap">
+            Neko AI · Fase 3
             <span className="text-cyan-400/50">·</span>
             <span className="flex items-center gap-1">
               {activeProvider === 'ollama' ? (
@@ -561,6 +661,22 @@ export function NekoHub() {
                 </span>
               </>
             )}
+            {memoriesCount > 0 && (
+              <>
+                <span className="text-cyan-400/50">·</span>
+                <span className="flex items-center gap-1 text-cyan-300">
+                  <Brain className="w-2.5 h-2.5" /> {memoriesCount} recuerdos
+                </span>
+              </>
+            )}
+            {memorizing && (
+              <>
+                <span className="text-cyan-400/50">·</span>
+                <span className="flex items-center gap-1 text-amber-300">
+                  <Loader2 className="w-2.5 h-2.5 animate-spin" /> memorizando…
+                </span>
+              </>
+            )}
           </span>
           <span className="flex items-center gap-1.5 font-mono">
             {isLoading && <Loader2 className="w-3 h-3 animate-spin" />}
@@ -575,6 +691,7 @@ export function NekoHub() {
         open={voiceprintOpen}
         onOpenChange={setVoiceprintOpen}
       />
+      <MemoryPanel open={memoryOpen} onOpenChange={setMemoryOpen} />
     </div>
   );
 }

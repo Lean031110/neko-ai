@@ -8,7 +8,7 @@ on:
 
 jobs:
   quality:
-    name: Lint & Type-check
+    name: Lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -35,7 +35,7 @@ jobs:
         run: bun run lint
 
   build:
-    name: Build
+    name: Build (static export)
     runs-on: ubuntu-latest
     needs: quality
     timeout-minutes: 15
@@ -59,18 +59,15 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build (compile check)
+      - name: Build (static export with base path)
+        run: bun run build:static
         env:
-          # Sin API key real: usamos z-ai-web-dev-sdk como fallback
-          LLM_PROVIDER: auto
-        run: bun run build
-        continue-on-error: true # el build standalone puede fallar por config; lo importante es que compile
+          NEXT_PUBLIC_STATIC_EXPORT: 'true'
+          NEXT_PUBLIC_BASE_PATH: '/neko-ai'
 
-      - name: Upload build artifacts
-        if: always()
+      - name: Upload static build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-output
-          path: .next/
+          name: static-build
+          path: out/
           retention-days: 3
-          if-no-files-found: ignore
