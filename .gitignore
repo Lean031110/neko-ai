@@ -50,3 +50,18 @@ coverage/
 *.tsbuildinfo
 next-env.d.ts
 .zscripts/
+
+# Neko AI specifics
+/tests/
+/download/
+/tool-results/
+*.local
+.dev.pid
+
+# Archivos internos del entorno (NO commitear)
+/skills/
+/examples/
+/mini-services/
+/db/
+/dev.log
+/dev.pid
